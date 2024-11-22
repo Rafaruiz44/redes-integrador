@@ -1,0 +1,115 @@
+import requests
+import json
+
+# URL base
+baseUri = "http://172.16.10.253/api/v1"
+
+# Llamada al API por el ticket
+headers = {"Content-Type": "application/json"}
+data = json.dumps({"username": "cisco", "password": "class"})
+
+# Realizar la solicitud
+resp = requests.post(baseUri + "/ticket", data=data, headers=headers)
+
+print("Status de Solicitud:")
+print(resp.status_code)
+
+# Procesar la respuesta
+if resp.status_code == 201:  # Éxito, el ticket fue creado correctamente
+    result = resp.json()
+    print("Respuesta completa del servidor:")
+    print(result)
+
+    # Validar la estructura de la respuesta
+    if "response" in result and "serviceTicket" in result["response"]:
+        ticket = result["response"]["serviceTicket"]
+        print("\nEl Service Ticket es:")
+        print(ticket)
+    else:
+        print("Error: La respuesta no contiene 'response' o 'serviceTicket'.")
+else:  # Fallo
+    print("Error al solicitar el ticket. Codigo de estado: {}".format(resp.status_code))
+    print("Detalle de la respuesta: {}".format(resp.text))
+
+headers = {"X-Auth-Token": ticket}
+
+def listarUsuarios():
+    resp = requests.get(baseUri + "/user", headers=headers)
+
+    if resp.status_code == 200:
+        result = resp.json()
+        print("\nUsuarios :\n")
+        for item in result.get("response", []):
+            # Usar .get() para obtener valores de manera segura
+            role = item.get("authorization", [])[0].get("role")
+            username = item.get("username", "Desconocido")
+            print("user: " + username + " - role: " + role)
+    else:
+        print("Error al obtener los dispositivos:", resp.status_code)
+        print("Detalle:", resp.text)
+
+def agregarUsuario(usuario):
+    data = json.dumps(usuario)
+    resp = requests.post(baseUri + "/user", data=data, headers=headers)
+    if resp.status_code == 200 or resp.status_code == 201:
+        print("\nUsuario creado!\n")
+    else:
+        print("Error al crear usuario")
+        print("Error ", resp.status_code)
+        print("Detalle:", resp.text)
+        
+def modificarUsuario(usuarioModificado):
+    data = json.dumps(usuarioModificado)
+    resp = requests.put(baseUri + "/user", data=data, headers=headers)
+    if resp.status_code == 200 or resp.status_code == 201:
+        print("\nUsuario modificado!\n")
+    else:
+        print("Error al modificar usuario")
+        print("Error ", resp.status_code)
+        print("Detalle:", resp.text)
+
+def eliminarUsuario(username):
+    resp = requests.delete(baseUri + "/user/" + username, headers=headers)
+    if resp.status_code == 200 or resp.status_code == 201:
+        print("\nUsuario eliminado!\n")
+    else:
+        print("Error al delete usuario")
+        print("Error ", resp.status_code)
+        print("Detalle:", resp.text)
+
+def crearCredencialCli():
+    url = baseUri + "/global-credential/cli"
+    auth = ("cisco", "class")
+    headers = {
+        "Content-Type": "application/json",
+        "X-Auth-Token": ticket
+    }
+
+    # datos de la credencial CLI
+    payload = {
+        "credentialType": "CLI",
+        "username": "cisco",  # Usuario de la CLI
+        "password": "class",  # Contraseña del usuario
+        "enablePassword": "enablepassword123",  # Contraseña para modo privilegiado
+        "comments": "Credencial para acceso CLI",
+        "description": "ssh - API"
+    }
+
+    response = requests.post(url, auth=auth, json=payload, headers=headers)
+
+    if response.status_code == 201:  # Código 201 indica que el recurso fue creado
+        print("Credencial CLI creada con exito:", response.json())
+    else:
+        print("Error al crear credencial CLI:", response.status_code, response.text)
+
+nuevoUsuario = {"username": "observer", "password": "observer", 'authorization': [{'role': 'ROLE_OBSERVER'}]}
+
+listarUsuarios()
+agregarUsuario(nuevoUsuario)
+listarUsuarios()
+nuevoUsuario['authorization'] = [{'role': 'ROLE_ADMIN'}]
+modificarUsuario(nuevoUsuario)
+listarUsuarios()
+eliminarUsuario(nuevoUsuario['username'])
+listarUsuarios()
+crearCredencialCli()
